@@ -1,0 +1,31 @@
+[package]
+name = "svt-av1-sys"
+version = "0.1.0"
+edition = "2021"
+links = "svtav1"
+description = "Raw Rust FFI bindings to the SVT-AV1 C API (encoder/decoder) generated with bindgen"
+license = "MIT OR Apache-2.0"
+repository = "https://example.invalid"
+readme = "README.md"
+build = "build.rs"
+
+[features]
+# Build-time bindgen is the default. Disable if you vendor prebuilt bindings.
+buildtime-bindgen = []
+default = ["buildtime-bindgen", "encoder"]
+
+# Feature flags to include Encoder and/or Decoder APIs.
+encoder = []
+# Decoder headers are not present in SVT-AV1 v3.1.2; keep the feature off by default.
+decoder = []
+
+[dependencies]
+libc = "0.2"
+
+[build-dependencies]
+bindgen = { version = "0.72", optional = false }
+pkg-config = "0.3"
+
+[package.metadata.docs.rs]
+features = ["encoder", "decoder"]
+no-default-features = false

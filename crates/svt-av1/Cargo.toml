@@ -1,0 +1,18 @@
+[package]
+name = "svt-av1"
+version = "0.1.0"
+edition = "2021"
+description = "Safe(ish) ergonomic wrapper around svt-av1-sys"
+license = "MIT OR Apache-2.0"
+repository = "https://example.invalid"
+readme = "README.md"
+
+[features]
+default = ["encoder"]
+encoder = ["svt-av1-sys/encoder"]
+decoder = ["svt-av1-sys/decoder"]
+
+[dependencies]
+svt-av1-sys = { path = "../svt-av1-sys", version = "0.1.0" }
+libc = "0.2"
+thiserror = "1"

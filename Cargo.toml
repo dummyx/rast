@@ -1,0 +1,13 @@
+[package]
+name = "rast"
+version = "0.1.0"
+edition = "2024"
+
+[workspace]
+members = [
+    ".",
+    "crates/svt-av1-sys",
+    "crates/svt-av1",
+]
+
+[dependencies]
