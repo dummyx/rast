@@ -1,5 +1,13 @@
 use std::{env, path::PathBuf};
 
+fn parse_bool(val: &str) -> bool {
+    val == "1" || val.eq_ignore_ascii_case("true") || val.eq_ignore_ascii_case("yes")
+}
+
+fn env_flag(var: &str) -> bool {
+    env::var(var).map(|v| parse_bool(&v)).unwrap_or(false)
+}
+
 fn try_pkg_config(names: &[&str]) -> Option<pkg_config::Library> {
     for name in names {
         match pkg_config::Config::new().probe(name) {
@@ -26,13 +34,13 @@ fn possible_include_dirs() -> Vec<PathBuf> {
     dirs
 }
 
-fn discover_and_link(enc: bool, dec: bool) -> Vec<PathBuf> {
+fn link_with_provided(enc: bool, dec: bool) -> Option<Vec<PathBuf>> {
     let mut include_paths: Vec<PathBuf> = Vec::new();
 
-    // Default: pin to vendored headers unless explicitly told otherwise.
+    // Use pkg-config only when explicitly allowed.
     let no_pc_env = env::var("SVT_AV1_NO_PKG_CONFIG").ok();
-    let no_pc = no_pc_env.as_deref() == Some("1") || no_pc_env.is_none();
-    if !no_pc {
+    let use_pkg_config = no_pc_env.as_deref() == Some("0");
+    if use_pkg_config {
         if let Some(lib) = if let Ok(override_name) = env::var("SVT_AV1_PKG_CONFIG_NAME") {
             pkg_config::Config::new().probe(&override_name).ok()
         } else {
@@ -46,30 +54,73 @@ fn discover_and_link(enc: bool, dec: bool) -> Vec<PathBuf> {
                 println!("cargo:rustc-link-lib=SvtAv1Dec");
             }
             include_paths.extend(lib.include_paths);
-            return include_paths;
+            return Some(include_paths);
         }
     }
 
-    // Manual discovery via env var dir, defaulting to vendored headers.
-    let include_dir = env::var("SVT_AV1_INCLUDE_DIR")
-        .ok()
-        .map(PathBuf::from)
-        .unwrap_or_else(|| PathBuf::from("vendor/SVT-AV1/Source/API"));
-    if include_dir.exists() {
-        include_paths.push(include_dir);
-    }
-
-    if let Ok(dir) = env::var("SVT_AV1_LIB_DIR") {
+    // Manual discovery via env var dir, only if lib dir is provided.
+    let lib_dir = env::var("SVT_AV1_LIB_DIR").ok();
+    if let Some(dir) = lib_dir.as_ref() {
         println!("cargo:rustc-link-search=native={}", dir);
-    }
-    if enc {
-        println!("cargo:rustc-link-lib=SvtAv1Enc");
-    }
-    if dec {
-        println!("cargo:rustc-link-lib=SvtAv1Dec");
+        if enc {
+            println!("cargo:rustc-link-lib=SvtAv1Enc");
+        }
+        if dec {
+            println!("cargo:rustc-link-lib=SvtAv1Dec");
+        }
+        let include_dir = env::var("SVT_AV1_INCLUDE_DIR")
+            .ok()
+            .map(PathBuf::from)
+            .unwrap_or_else(|| PathBuf::from("vendor/SVT-AV1/Source/API"));
+        include_paths.push(include_dir);
+        return Some(include_paths);
     }
 
-    include_paths
+    None
+}
+
+fn build_vendored(enc: bool, dec: bool) -> Vec<PathBuf> {
+    if dec {
+        panic!("Decoder feature requested but EbSvtAv1Dec.h is not vendored. Provide a decoder-capable system install with SVT_AV1_NO_PKG_CONFIG=0 or SVT_AV1_LIB_DIR.");
+    }
+
+    let enable_lto = env::var("SVT_AV1_ENABLE_LTO")
+        .map(|v| parse_bool(&v))
+        .unwrap_or(true);
+
+    let manifest_dir =
+        PathBuf::from(env::var("CARGO_MANIFEST_DIR").expect("CARGO_MANIFEST_DIR not set"));
+    let vendor_dir = manifest_dir.join("../../vendor/SVT-AV1");
+    if !vendor_dir.exists() {
+        panic!(
+            "Vendored SVT-AV1 source not found at {}",
+            vendor_dir.display()
+        );
+    }
+
+    let dst = cmake::Config::new(&vendor_dir)
+        .profile("Release")
+        .define("BUILD_SHARED_LIBS", "OFF")
+        .define("BUILD_APPS", "OFF")
+        .define("BUILD_TESTING", "OFF")
+        .define("ENABLE_LTO", if enable_lto { "ON" } else { "OFF" })
+        .define("CMAKE_POSITION_INDEPENDENT_CODE", "ON")
+        .build();
+
+    let mut lib_dir = dst.join("lib");
+    if !lib_dir.exists() {
+        let alt = dst.join("lib64");
+        if alt.exists() {
+            lib_dir = alt;
+        }
+    }
+
+    println!("cargo:rustc-link-search=native={}", lib_dir.display());
+    if enc {
+        println!("cargo:rustc-link-lib=static=SvtAv1Enc");
+    }
+
+    vec![vendor_dir.join("Source/API")]
 }
 
 #[cfg(feature = "buildtime-bindgen")]
@@ -144,7 +195,16 @@ fn main() {
     let enc = cfg!(feature = "encoder");
     let dec = cfg!(feature = "decoder");
 
-    let include_dirs = discover_and_link(enc, dec);
+    let force_vendor = env_flag("SVT_AV1_BUILD_FROM_SOURCE");
+    let include_dirs = if force_vendor {
+        None
+    } else {
+        link_with_provided(enc, dec)
+    };
+    let include_dirs = match include_dirs {
+        Some(paths) => paths,
+        None => build_vendored(enc, dec),
+    };
 
     // Decoder headers are not present in the vendored tree; require an override for decoding.
     if dec {
@@ -159,6 +219,8 @@ fn main() {
     generate_bindings(enc, dec, include_dirs);
 
     // Always rerun if env hints change
+    println!("cargo:rerun-if-env-changed=SVT_AV1_BUILD_FROM_SOURCE");
+    println!("cargo:rerun-if-env-changed=SVT_AV1_ENABLE_LTO");
     println!("cargo:rerun-if-env-changed=SVT_AV1_INCLUDE_DIR");
     println!("cargo:rerun-if-env-changed=SVT_AV1_LIB_DIR");
     println!("cargo:rerun-if-env-changed=SVT_AV1_PKG_CONFIG_NAME");

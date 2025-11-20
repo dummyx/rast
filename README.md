@@ -7,7 +7,7 @@ This workspace provides a modern Rust binding for SVT-AV1 (validated against v3.
 - `svt-av1`: Thin, safe(ish) wrappers with RAII around core init/teardown and I/O calls for the encoder.
 
 Getting started
-- Preferred, fully deterministic setup is to use the vendored headers (v3.1.2) in this repo:
+- Preferred, fully deterministic setup is to use the vendored headers (v3.1.2) in this repo. The build now compiles the vendored SVT-AV1 encoder via CMake when pkg-config is disabled (default) and no `SVT_AV1_LIB_DIR` is provided:
   - `SVT_AV1_NO_PKG_CONFIG=1 SVT_AV1_INCLUDE_DIR=vendor/SVT-AV1/Source/API cargo check -p svt-av1-sys`
   - `SVT_AV1_NO_PKG_CONFIG=1 SVT_AV1_INCLUDE_DIR=vendor/SVT-AV1/Source/API cargo check -p svt-av1`
 - Alternatively, ensure compatible SVT-AV1 headers and libraries are installed on your system (needed for decoding since the vendored copy is encoder-only).
@@ -21,6 +21,8 @@ Environment variables
 - `SVT_AV1_LIB_DIR`: directory containing libraries.
 - `SVT_AV1_PKG_CONFIG_NAME`: override pkg-config package name.
 - `SVT_AV1_NO_PKG_CONFIG=1`: disable pkg-config probing (default if unset; pkg-config is opt-in).
+- `SVT_AV1_BUILD_FROM_SOURCE=1`: force building the vendored SVT-AV1 codec; set to `0` and provide libraries/pkg-config if you want to skip the vendored build.
+- `SVT_AV1_ENABLE_LTO=0/1`: toggle link-time optimization for vendored builds (default on).
 
 Features
 - `encoder` (default) and `decoder` features in both crates; SVT-AV1 v3.1.2 exposes encoder headers only. Enabling `decoder` requires an external SVT-AV1 install with decoder headers/libraries and `SVT_AV1_NO_PKG_CONFIG=0` (or manual include/lib dirs).

@@ -24,6 +24,7 @@ libc = "0.2"
 
 [build-dependencies]
 bindgen = { version = "0.72", optional = false }
+cmake = "0.1"
 pkg-config = "0.3"
 
 [package.metadata.docs.rs]
