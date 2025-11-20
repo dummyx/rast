@@ -1,0 +1,6 @@
+# Project Overview
+- Purpose: Rust workspace providing SVT-AV1 bindings pinned to upstream v3.1.2; `svt-av1-sys` exposes raw bindgen-generated FFI (encoder default, decoder optional) and `svt-av1` supplies minimal RAII-safe wrappers close to the C API. Root binary `rast` currently just prints a greeting.
+- Tech stack: Rust 2024 at workspace root; crates target Rust 2021; FFI to SVT-AV1 C libs via bindgen/pkg-config; deps include `libc`, `bindgen`, `pkg-config`, `thiserror`.
+- Structure: `src/` root binary; `crates/svt-av1-sys/` sys bindings with build.rs; `crates/svt-av1/` safe wrapper; `vendor/SVT-AV1/` vendored encoder headers v3.1.2; `.github/workflows/bindgen.yml` runs bindgen vs vendored headers; sample media assets in repo root.
+- Build behavior: `svt-av1-sys` runs bindgen at build time by default (`buildtime-bindgen` feature) and links via pkg-config unless disabled. Build prefers vendored headers; pkg-config is opt-in via `SVT_AV1_NO_PKG_CONFIG=0` or setting `SVT_AV1_PKG_CONFIG_NAME`. Decoder feature requires external install with decoder headers/libs (vendored copy is encoder-only).
+- Key env vars: `SVT_AV1_INCLUDE_DIR` and `SVT_AV1_LIB_DIR` for manual header/lib paths; `SVT_AV1_NO_PKG_CONFIG` (default 1 to skip pkg-config), `SVT_AV1_PKG_CONFIG_NAME` to override package name.

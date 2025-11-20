@@ -7,19 +7,23 @@ This workspace provides a modern Rust binding for SVT-AV1 (validated against v3.
 - `svt-av1`: Thin, safe(ish) wrappers with RAII around core init/teardown and I/O calls for the encoder.
 
 Getting started
-- Ensure SVT-AV1 headers and libraries are installed on your system.
+- Preferred, fully deterministic setup is to use the vendored headers (v3.1.2) in this repo:
+  - `SVT_AV1_NO_PKG_CONFIG=1 SVT_AV1_INCLUDE_DIR=vendor/SVT-AV1/Source/API cargo check -p svt-av1-sys`
+  - `SVT_AV1_NO_PKG_CONFIG=1 SVT_AV1_INCLUDE_DIR=vendor/SVT-AV1/Source/API cargo check -p svt-av1`
+- Alternatively, ensure compatible SVT-AV1 headers and libraries are installed on your system (needed for decoding since the vendored copy is encoder-only).
   - Typical headers: `EbSvtAv1Enc.h`, `EbSvtAv1Dec.h` in `/usr/include/svt-av1`.
   - Libraries: `libSvtAv1Enc.*` and `libSvtAv1Dec.*` in your system library path.
-- Build will try `pkg-config` with names `svt-av1`, `SvtAv1Enc` (and `SvtAv1Dec` if decoder is enabled).
+- Build now pins to the vendored headers by default; pkg-config is opt-in via `SVT_AV1_NO_PKG_CONFIG=0` (or setting `SVT_AV1_PKG_CONFIG_NAME`).
+  - If decoder is enabled, a decoder-capable install must be provided (vendored headers do not ship `EbSvtAv1Dec.h`).
 
 Environment variables
 - `SVT_AV1_INCLUDE_DIR`: directory containing headers.
 - `SVT_AV1_LIB_DIR`: directory containing libraries.
 - `SVT_AV1_PKG_CONFIG_NAME`: override pkg-config package name.
-- `SVT_AV1_NO_PKG_CONFIG=1`: disable pkg-config probing.
+- `SVT_AV1_NO_PKG_CONFIG=1`: disable pkg-config probing (default if unset; pkg-config is opt-in).
 
 Features
-- `encoder` (default) and `decoder` features in both crates; SVT-AV1 v3.1.2 exposes encoder headers only.
+- `encoder` (default) and `decoder` features in both crates; SVT-AV1 v3.1.2 exposes encoder headers only. Enabling `decoder` requires an external SVT-AV1 install with decoder headers/libraries and `SVT_AV1_NO_PKG_CONFIG=0` (or manual include/lib dirs).
 - `svt-av1-sys/buildtime-bindgen` enabled by default to run bindgen at build time.
 
 Examples

@@ -7,7 +7,8 @@
 // Otherwise, the crate can be adapted to include prebuilt bindings from src/.
 
 #[cfg(feature = "encoder")]
-mod enc_bindings {
+#[cfg(feature = "encoder")]
+pub mod enc_bindings {
     #[cfg(feature = "buildtime-bindgen")]
     include!(concat!(env!("OUT_DIR"), "/bindings_encoder.rs"));
 
@@ -16,7 +17,7 @@ mod enc_bindings {
 }
 
 #[cfg(feature = "decoder")]
-mod dec_bindings {
+pub mod dec_bindings {
     #[cfg(feature = "buildtime-bindgen")]
     include!(concat!(env!("OUT_DIR"), "/bindings_decoder.rs"));
 
@@ -25,8 +26,4 @@ mod dec_bindings {
 }
 
 // Public re-exports to present a flat module surface
-#[cfg(feature = "encoder")]
-pub use enc_bindings::*;
-#[cfg(feature = "decoder")]
-pub use dec_bindings::*;
-
+// Removed to avoid ambiguous glob re-exports. Use `enc_bindings` or `dec_bindings` directly.

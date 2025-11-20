@@ -14,6 +14,7 @@
 - Safe wrapper: `cargo build -p svt-av1`
 - Example (encoder):
   `SVT_AV1_NO_PKG_CONFIG=1 SVT_AV1_INCLUDE_DIR=vendor/SVT-AV1/Source/API cargo check -p svt-av1 --example encode`
+- When system SVT‑AV1 headers/libs are present, they must be API‑compatible with v3.1.2; if not, prefer the vendored/header‑only commands above to avoid bindgen/type mismatches. Decoder requires a system install with `EbSvtAv1Dec.h`/`libSvtAv1Dec` (vendored copy is encoder-only); pkg-config is opt-in via `SVT_AV1_NO_PKG_CONFIG=0`.
 - Format & lint: `cargo fmt --all`, `cargo clippy --workspace -D warnings`
 
 ## Coding Style & Naming Conventions

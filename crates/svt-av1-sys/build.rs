@@ -12,7 +12,9 @@ fn try_pkg_config(names: &[&str]) -> Option<pkg_config::Library> {
 
 fn possible_include_dirs() -> Vec<PathBuf> {
     let mut dirs = Vec::new();
-    if let Ok(dir) = env::var("SVT_AV1_INCLUDE_DIR") { dirs.push(PathBuf::from(dir)); }
+    if let Ok(dir) = env::var("SVT_AV1_INCLUDE_DIR") {
+        dirs.push(PathBuf::from(dir));
+    }
     // Common system paths
     dirs.push(PathBuf::from("/usr/include/svt-av1"));
     dirs.push(PathBuf::from("/usr/local/include/svt-av1"));
@@ -27,8 +29,9 @@ fn possible_include_dirs() -> Vec<PathBuf> {
 fn discover_and_link(enc: bool, dec: bool) -> Vec<PathBuf> {
     let mut include_paths: Vec<PathBuf> = Vec::new();
 
-    // First try pkg-config unless explicitly disabled
-    let no_pc = env::var("SVT_AV1_NO_PKG_CONFIG").ok().as_deref() == Some("1");
+    // Default: pin to vendored headers unless explicitly told otherwise.
+    let no_pc_env = env::var("SVT_AV1_NO_PKG_CONFIG").ok();
+    let no_pc = no_pc_env.as_deref() == Some("1") || no_pc_env.is_none();
     if !no_pc {
         if let Some(lib) = if let Ok(override_name) = env::var("SVT_AV1_PKG_CONFIG_NAME") {
             pkg_config::Config::new().probe(&override_name).ok()
@@ -36,21 +39,35 @@ fn discover_and_link(enc: bool, dec: bool) -> Vec<PathBuf> {
             // Try a few common names
             try_pkg_config(&["svt-av1", "SvtAv1Enc", "SvtAv1Dec"]) // decoder may not be packaged separately
         } {
-            if enc { println!("cargo:rustc-link-lib=SvtAv1Enc"); }
-            if dec { println!("cargo:rustc-link-lib=SvtAv1Dec"); }
+            if enc {
+                println!("cargo:rustc-link-lib=SvtAv1Enc");
+            }
+            if dec {
+                println!("cargo:rustc-link-lib=SvtAv1Dec");
+            }
             include_paths.extend(lib.include_paths);
             return include_paths;
         }
     }
 
-    // Manual discovery via env var dir
+    // Manual discovery via env var dir, defaulting to vendored headers.
+    let include_dir = env::var("SVT_AV1_INCLUDE_DIR")
+        .ok()
+        .map(PathBuf::from)
+        .unwrap_or_else(|| PathBuf::from("vendor/SVT-AV1/Source/API"));
+    if include_dir.exists() {
+        include_paths.push(include_dir);
+    }
+
     if let Ok(dir) = env::var("SVT_AV1_LIB_DIR") {
         println!("cargo:rustc-link-search=native={}", dir);
     }
-    if enc { println!("cargo:rustc-link-lib=SvtAv1Enc"); }
-    if dec { println!("cargo:rustc-link-lib=SvtAv1Dec"); }
-
-    if let Ok(inc) = env::var("SVT_AV1_INCLUDE_DIR") { include_paths.push(PathBuf::from(inc)); }
+    if enc {
+        println!("cargo:rustc-link-lib=SvtAv1Enc");
+    }
+    if dec {
+        println!("cargo:rustc-link-lib=SvtAv1Dec");
+    }
 
     include_paths
 }
@@ -69,10 +86,7 @@ fn generate_bindings(enc: bool, dec: bool, mut include_dirs: Vec<PathBuf>) {
 
     if enc {
         let mut builder = bindgen::Builder::default()
-            .header_contents(
-                "wrapper_enc.h",
-                "#include <EbSvtAv1Enc.h>\n",
-            )
+            .header_contents("wrapper_enc.h", "#include <EbSvtAv1Enc.h>\n")
             .allowlist_recursively(true)
             .clang_args(&clang_args)
             .parse_callbacks(Box::new(bindgen::CargoCallbacks::new()))
@@ -99,7 +113,7 @@ fn generate_bindings(enc: bool, dec: bool, mut include_dirs: Vec<PathBuf>) {
         let mut builder = bindgen::Builder::default()
             .header_contents(
                 "wrapper_dec.h",
-                "#include <EbSvtAv1Dec.h>\n",
+                "#include <stddef.h>\n#include <EbSvtAv1Dec.h>\n",
             )
             .allowlist_recursively(true)
             .clang_args(&clang_args)
@@ -131,6 +145,17 @@ fn main() {
     let dec = cfg!(feature = "decoder");
 
     let include_dirs = discover_and_link(enc, dec);
+
+    // Decoder headers are not present in the vendored tree; require an override for decoding.
+    if dec {
+        let has_dec_header = include_dirs
+            .iter()
+            .any(|p| p.join("EbSvtAv1Dec.h").exists());
+        if !has_dec_header {
+            panic!("Decoder feature requested but EbSvtAv1Dec.h not found. The vendored SVT-AV1 copy is encoder-only; set SVT_AV1_NO_PKG_CONFIG=0 and provide a decoder-capable install to enable decoding.");
+        }
+    }
+
     generate_bindings(enc, dec, include_dirs);
 
     // Always rerun if env hints change
