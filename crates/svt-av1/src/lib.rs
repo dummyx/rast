@@ -1,8 +1,13 @@
+#![doc = include_str!("../README.md")]
 #![deny(unsafe_op_in_unsafe_fn)]
 use svt_av1_sys as sys;
 
 use thiserror::Error;
 
+/// Errors surfaced by the safe wrapper.
+///
+/// Most variants map directly to SVT-AV1 `EbErrorType` codes returned from FFI
+/// entry points; `Null` guards against accidentally passing null handles.
 #[derive(Debug, Error)]
 pub enum Error {
     #[error("SVT-AV1 error code {0}")]
@@ -11,8 +16,10 @@ pub enum Error {
     Null,
 }
 
+/// Result alias using the wrapper [`Error`] type.
 pub type Result<T> = std::result::Result<T, Error>;
 
+/// Converts an SVT-AV1 status code to a [`Result`].
 fn ok(code: i32) -> Result<()> {
     if code == 0 {
         Ok(())
@@ -22,9 +29,13 @@ fn ok(code: i32) -> Result<()> {
 }
 
 /// Strongly-typed helpers and enums for configuring the encoder.
+///
+/// These map directly to fields on `EbSvtAv1EncConfiguration` so callers can
+/// configure the encoder with type safety.
 pub mod config {
     use super::sys;
 
+    /// Bit depth of the input pixels.
     #[derive(Copy, Clone, Debug, Eq, PartialEq)]
     #[repr(u32)]
     pub enum BitDepth {
@@ -33,6 +44,7 @@ pub mod config {
         Twelve = 12,
     }
 
+    /// Chroma subsampling mode.
     #[derive(Copy, Clone, Debug, Eq, PartialEq)]
     #[repr(u32)]
     pub enum ColorFormat {
@@ -42,6 +54,7 @@ pub mod config {
         Yuv444 = 3,
     }
 
+    /// Luma range interpretation.
     #[derive(Copy, Clone, Debug, Eq, PartialEq)]
     #[repr(u32)]
     pub enum ColorRange {
@@ -49,6 +62,7 @@ pub mod config {
         Full = 1,
     }
 
+    /// Chroma sample location.
     #[derive(Copy, Clone, Debug, Eq, PartialEq)]
     #[repr(u32)]
     pub enum ChromaSamplePosition {
@@ -57,6 +71,7 @@ pub mod config {
         Colocated = 2,
     }
 
+    /// AV1 profile selector.
     #[derive(Copy, Clone, Debug, Eq, PartialEq)]
     #[repr(u32)]
     pub enum Profile {
@@ -65,6 +80,7 @@ pub mod config {
         Professional = 2,
     }
 
+    /// AV1 level tier.
     #[derive(Copy, Clone, Debug, Eq, PartialEq)]
     #[repr(u32)]
     pub enum Tier {
@@ -72,6 +88,9 @@ pub mod config {
         High = 1,
     }
 
+    /// Rate control mode.
+    ///
+    /// `CqpOrCrf` matches the SVT-AV1 CQP/CRF setting.
     #[derive(Copy, Clone, Debug, Eq, PartialEq)]
     #[repr(u8)]
     pub enum RcMode {
@@ -80,6 +99,7 @@ pub mod config {
         Cbr = 2,
     }
 
+    /// Intra refresh strategy.
     #[derive(Copy, Clone, Debug, Eq, PartialEq)]
     #[repr(u32)]
     pub enum IntraRefreshType {
@@ -88,20 +108,37 @@ pub mod config {
     }
 
     /// Convenience extension methods for `EbSvtAv1EncConfiguration`.
+    ///
+    /// Each method mutates the configuration in place and returns `self` for
+    /// easy chaining when constructing encoder settings.
     pub trait ConfigExt {
+        /// Sets the encoded frame resolution in pixels.
         fn set_resolution(&mut self, width: u32, height: u32) -> &mut Self;
+        /// Sets the input frame rate as a rational numerator/denominator pair.
         fn set_frame_rate(&mut self, num: u32, den: u32) -> &mut Self;
+        /// Selects encoder input bit depth.
         fn set_bit_depth(&mut self, depth: BitDepth) -> &mut Self;
+        /// Sets the chroma subsampling format.
         fn set_color_format(&mut self, fmt: ColorFormat) -> &mut Self;
+        /// Sets the luma range interpretation.
         fn set_color_range(&mut self, range: ColorRange) -> &mut Self;
+        /// Sets the chroma sample position.
         fn set_chroma_sample_position(&mut self, csp: ChromaSamplePosition) -> &mut Self;
+        /// Chooses the AV1 profile.
         fn set_profile(&mut self, profile: Profile) -> &mut Self;
+        /// Sets the tier for level signalling.
         fn set_tier(&mut self, tier: Tier) -> &mut Self;
+        /// Lets the encoder auto-select the level.
         fn set_level_auto(&mut self) -> &mut Self;
+        /// Overrides the level using an explicit level code.
         fn set_level_code(&mut self, level_code: u32) -> &mut Self;
+        /// Sets the rate control mode.
         fn set_rc_mode(&mut self, mode: RcMode) -> &mut Self;
+        /// Sets the target bitrate in bits per second.
         fn set_target_bitrate(&mut self, bps: u32) -> &mut Self;
+        /// Sets the fixed quantizer parameter (QP).
         fn set_qp(&mut self, qp: u32) -> &mut Self;
+        /// Configures intra refresh behavior.
         fn set_intra_refresh(&mut self, t: IntraRefreshType) -> &mut Self;
         /// Enable or disable ROI map usage in the encoder configuration.
         ///
@@ -182,14 +219,18 @@ pub mod config {
 }
 
 #[cfg(feature = "encoder")]
+/// Safe encoder wrappers over the SVT-AV1 C API (enabled by the `encoder` feature).
 pub mod encoder {
     use super::*;
     use std::ffi::{CStr, CString};
 
+    /// Raw frame/packet header exchanged with the C API.
     pub use sys::enc_bindings::EbBufferHeaderType as BufferHeader;
+    /// Raw encoder component handle from SVT-AV1.
     pub use sys::enc_bindings::EbComponentType as Component;
     /// Raw per-picture private data node used to pass ROI maps and other events.
     pub use sys::enc_bindings::EbPrivDataNode as PrivDataNode;
+    /// Encoder configuration struct matching the SVT-AV1 C layout.
     pub use sys::enc_bindings::EbSvtAv1EncConfiguration as Configuration;
     /// Raw ROI map types from the C API.
     pub use sys::enc_bindings::SvtAv1RoiMap as RoiMap;
@@ -199,6 +240,7 @@ pub mod encoder {
         sys::enc_bindings::PrivDataType_ROI_MAP_EVENT;
     // The public API primarily uses BufferHeader and Configuration for I/O and params.
 
+    /// Owned encoder handle that cleans up via `Drop`.
     pub struct Handle(*mut Component);
 
     unsafe impl Send for Handle {}
@@ -211,15 +253,19 @@ pub mod encoder {
     }
 
     impl Handle {
+        /// Creates a null handle suitable for initialization calls.
         pub fn new() -> Self {
             Self(std::ptr::null_mut())
         }
+        /// Returns a mutable pointer to the inner handle for FFI APIs that fill it.
         pub fn as_mut_ptr(&mut self) -> *mut *mut Component {
             &mut self.0 as *mut _
         }
+        /// Returns the raw handle pointer.
         pub fn as_ptr(&self) -> *mut Component {
             self.0
         }
+        /// Returns true if the handle has not been initialized.
         pub fn is_null(&self) -> bool {
             self.0.is_null()
         }
@@ -236,6 +282,7 @@ pub mod encoder {
         }
     }
 
+    /// RAII encoder entry point wrapping the SVT-AV1 handle.
     pub struct Encoder {
         handle: Handle,
     }
@@ -251,6 +298,7 @@ pub mod encoder {
             unsafe { sys::enc_bindings::svt_av1_print_version() }
         }
 
+        /// Creates a new encoder handle and fills a default configuration.
         pub fn init_default() -> Result<(Self, Configuration)> {
             let mut handle = Handle::new();
             let mut cfg: Configuration = unsafe { std::mem::zeroed() };
@@ -265,6 +313,7 @@ pub mod encoder {
             Ok((Self { handle }, cfg))
         }
 
+        /// Applies an `EbSvtAv1EncConfiguration` to an existing handle.
         pub fn set_parameter(&mut self, cfg: &Configuration) -> Result<()> {
             let code = unsafe {
                 sys::enc_bindings::svt_av1_enc_set_parameter(
@@ -294,11 +343,13 @@ pub mod encoder {
             Self::parse_parameter(cfg, &n, &v)
         }
 
+        /// Finalizes initialization after parameters have been configured.
         pub fn init(&mut self) -> Result<()> {
             let code = unsafe { sys::enc_bindings::svt_av1_enc_init(self.handle.as_ptr()) };
             super::ok(code)
         }
 
+        /// Submits a picture to the encoder. Ownership of `p_buffer` remains with the caller.
         pub fn send_picture(&mut self, pic: &mut BufferHeader) -> Result<()> {
             let code = unsafe {
                 sys::enc_bindings::svt_av1_enc_send_picture(self.handle.as_ptr(), pic as *mut _)
@@ -306,6 +357,7 @@ pub mod encoder {
             super::ok(code)
         }
 
+        /// Attempts to dequeue the next output packet, returning `None` if the queue is empty.
         pub fn get_packet(&mut self, pic_send_done: bool) -> Result<Option<*mut BufferHeader>> {
             // EB_NoErrorEmptyQueue indicates no packet available yet; not an error.
             const EB_NO_ERROR_EMPTY_QUEUE: i32 =
@@ -327,10 +379,12 @@ pub mod encoder {
             Err(super::Error::Code(code))
         }
 
+        /// Releases a packet previously obtained by [`get_packet`](Self::get_packet).
         pub fn release_out_buffer(&mut self, packet: &mut *mut BufferHeader) {
             unsafe { sys::enc_bindings::svt_av1_enc_release_out_buffer(packet as *mut _) };
         }
 
+        /// Retrieves the codec stream header packet.
         pub fn get_stream_header(&mut self, packet: &mut *mut BufferHeader) -> Result<()> {
             let code = unsafe {
                 sys::enc_bindings::svt_av1_enc_stream_header(self.handle.as_ptr(), packet as *mut _)
@@ -338,6 +392,8 @@ pub mod encoder {
             super::ok(code)
         }
 
+        /// Releases a stream header packet returned by [`get_stream_header`](Self::get_stream_header).
+        ///
         /// # Safety
         ///
         /// `packet` must be a valid stream header previously returned by
@@ -347,6 +403,7 @@ pub mod encoder {
             super::ok(code)
         }
 
+        /// Copies reconstructed frame data into the provided buffer header.
         pub fn get_recon(&mut self, buffer: &mut BufferHeader) -> Result<()> {
             let code = unsafe {
                 sys::enc_bindings::svt_av1_get_recon(self.handle.as_ptr(), buffer as *mut _)
@@ -354,6 +411,8 @@ pub mod encoder {
             super::ok(code)
         }
 
+        /// Queries encoder stream metadata by id into a caller-allocated buffer.
+        ///
         /// # Safety
         ///
         /// `info` must point to a writable buffer matching the requested `id`
@@ -408,9 +467,11 @@ pub mod encoder {
     /// RAII packet wrapper: releases the underlying buffer on drop.
     pub struct Packet(*mut BufferHeader);
     impl Packet {
+        /// Returns the raw `EbBufferHeaderType` pointer.
         pub fn as_ptr(&self) -> *mut BufferHeader {
             self.0
         }
+        /// Returns a shared reference to the buffer header.
         pub fn header(&self) -> &BufferHeader {
             unsafe { &*self.0 }
         }
@@ -425,6 +486,7 @@ pub mod encoder {
         }
     }
 
+    /// Iterator over encoder output packets; each yielded packet is freed on drop.
     pub struct PacketIter<'a> {
         enc: &'a mut Encoder,
         pic_send_done: bool,
@@ -442,13 +504,19 @@ pub mod encoder {
 }
 
 #[cfg(feature = "decoder")]
+/// Safe decoder wrappers over the SVT-AV1 C API (enabled by the `decoder` feature).
 pub mod decoder {
     use super::*;
 
+    /// Frame metadata returned alongside decoded buffers.
     pub use sys::dec_bindings::EbAV1FrameInfo as FrameInfo;
+    /// Stream metadata returned during decoding.
     pub use sys::dec_bindings::EbAV1StreamInfo as StreamInfo;
+    /// Raw buffer header used for decoder output.
     pub use sys::dec_bindings::EbBufferHeaderType as BufferHeader;
+    /// Raw decoder component handle from SVT-AV1.
     pub use sys::dec_bindings::EbComponentType as Component;
+    /// Decoder configuration struct matching the SVT-AV1 C layout.
     pub use sys::dec_bindings::EbSvtAv1DecConfiguration as Configuration;
 
     pub struct Handle(*mut Component);
@@ -462,15 +530,19 @@ pub mod decoder {
     }
 
     impl Handle {
+        /// Creates a null decoder handle suitable for initialization calls.
         pub fn new() -> Self {
             Self(std::ptr::null_mut())
         }
+        /// Returns a mutable pointer to the inner handle for FFI APIs that fill it.
         pub fn as_mut_ptr(&mut self) -> *mut *mut Component {
             &mut self.0 as *mut _
         }
+        /// Returns the raw handle pointer.
         pub fn as_ptr(&self) -> *mut Component {
             self.0
         }
+        /// Returns true if the handle has not been initialized.
         pub fn is_null(&self) -> bool {
             self.0.is_null()
         }
@@ -487,11 +559,13 @@ pub mod decoder {
         }
     }
 
+    /// RAII decoder entry point wrapping the SVT-AV1 handle.
     pub struct Decoder {
         handle: Handle,
     }
 
     impl Decoder {
+        /// Creates a new decoder handle and fills a default configuration.
         pub fn init_default() -> Result<(Self, Configuration)> {
             let mut handle = Handle::new();
             let mut cfg: Configuration = unsafe { std::mem::zeroed() };
@@ -506,6 +580,7 @@ pub mod decoder {
             Ok((Self { handle }, cfg))
         }
 
+        /// Applies an `EbSvtAv1DecConfiguration` to an existing handle.
         pub fn set_parameter(&mut self, cfg: &Configuration) -> Result<()> {
             let code = unsafe {
                 sys::dec_bindings::svt_av1_dec_set_parameter(
@@ -516,11 +591,13 @@ pub mod decoder {
             super::ok(code)
         }
 
+        /// Finalizes initialization after parameters have been configured.
         pub fn init(&mut self) -> Result<()> {
             let code = unsafe { sys::dec_bindings::svt_av1_dec_init(self.handle.as_ptr()) };
             super::ok(code)
         }
 
+        /// Feeds an encoded AV1 packet into the decoder.
         pub fn send_packet(&mut self, data: &[u8]) -> Result<()> {
             let code = unsafe {
                 sys::dec_bindings::svt_av1_dec_frame(
@@ -533,6 +610,7 @@ pub mod decoder {
             super::ok(code)
         }
 
+        /// Retrieves the next decoded picture and associated metadata.
         pub fn get_picture(
             &mut self,
             picture: &mut BufferHeader,
