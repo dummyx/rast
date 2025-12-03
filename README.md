@@ -22,7 +22,7 @@ Environment variables
 - `SVT_AV1_PKG_CONFIG_NAME`: override pkg-config package name.
 - `SVT_AV1_NO_PKG_CONFIG=1`: disable pkg-config probing (default if unset; pkg-config is opt-in).
 - `SVT_AV1_BUILD_FROM_SOURCE=1`: force building the vendored SVT-AV1 codec; set to `0` and provide libraries/pkg-config if you want to skip the vendored build.
-- `SVT_AV1_ENABLE_LTO=0/1`: toggle link-time optimization for vendored builds (default on).
+- `SVT_AV1_ENABLE_LTO=0/1`: toggle link-time optimization for vendored builds (default off; rust-lld cannot consume GCC LTO objects, so enable only if your toolchain supports it).
 
 Features
 - `encoder` (default) and `decoder` features in both crates; SVT-AV1 v3.1.2 exposes encoder headers only. Enabling `decoder` requires an external SVT-AV1 install with decoder headers/libraries and `SVT_AV1_NO_PKG_CONFIG=0` (or manual include/lib dirs).
