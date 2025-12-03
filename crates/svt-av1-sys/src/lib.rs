@@ -6,6 +6,16 @@
 // When the buildtime-bindgen feature is enabled (default), bindings are emitted to OUT_DIR.
 // Otherwise, the crate can be adapted to include prebuilt bindings from src/.
 
+// Link the encoder/decoder native libraries explicitly so downstream crates
+// pick up the correct static archive during final linking.
+#[cfg(feature = "encoder")]
+#[link(name = "SvtAv1Enc", kind = "static")]
+extern "C" {}
+
+#[cfg(feature = "decoder")]
+#[link(name = "SvtAv1Dec", kind = "static")]
+extern "C" {}
+
 #[cfg(feature = "encoder")]
 #[cfg(feature = "encoder")]
 pub mod enc_bindings {

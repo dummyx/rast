@@ -6,6 +6,7 @@ description = "Safe(ish) ergonomic wrapper around svt-av1-sys"
 license = "MIT OR Apache-2.0"
 repository = "https://example.invalid"
 readme = "README.md"
+build = "build.rs"
 
 [features]
 default = ["encoder"]

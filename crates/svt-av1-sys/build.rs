@@ -84,9 +84,19 @@ fn build_vendored(enc: bool, dec: bool) -> Vec<PathBuf> {
         panic!("Decoder feature requested but EbSvtAv1Dec.h is not vendored. Provide a decoder-capable system install with SVT_AV1_NO_PKG_CONFIG=0 or SVT_AV1_LIB_DIR.");
     }
 
-    let enable_lto = env::var("SVT_AV1_ENABLE_LTO")
-        .map(|v| parse_bool(&v))
-        .unwrap_or(true);
+    let enable_lto_env = env::var("SVT_AV1_ENABLE_LTO");
+    let enable_lto = enable_lto_env
+        .as_ref()
+        .map(|v| parse_bool(v))
+        // Default to OFF: rust-lld cannot consume the GCC LTO objects that the
+        // vendored build produces, which results in undefined references to the
+        // SVT-AV1 entry points when linking the Rust examples/tests.
+        .unwrap_or(false);
+    if enable_lto_env.is_err() && !enable_lto {
+        println!(
+            "cargo:warning=SVT-AV1 vendored build: disabling LTO by default for broader linker compatibility (set SVT_AV1_ENABLE_LTO=1 to force)"
+        );
+    }
 
     let manifest_dir =
         PathBuf::from(env::var("CARGO_MANIFEST_DIR").expect("CARGO_MANIFEST_DIR not set"));
@@ -103,8 +113,14 @@ fn build_vendored(enc: bool, dec: bool) -> Vec<PathBuf> {
         .define("BUILD_SHARED_LIBS", "OFF")
         .define("BUILD_APPS", "OFF")
         .define("BUILD_TESTING", "OFF")
+        // rust-lld cannot consume GCC LTO objects; explicitly disable any
+        // interprocedural optimization even if the upstream default toggles it.
+        .define("CMAKE_INTERPROCEDURAL_OPTIMIZATION", "OFF")
         .define("ENABLE_LTO", if enable_lto { "ON" } else { "OFF" })
         .define("CMAKE_POSITION_INDEPENDENT_CODE", "ON")
+        .cflag("-fno-lto")
+        .cxxflag("-fno-lto")
+        .asmflag("-fno-lto")
         .build();
 
     let mut lib_dir = dst.join("lib");
@@ -217,6 +233,15 @@ fn main() {
     }
 
     generate_bindings(enc, dec, include_dirs);
+
+    // Ensure the native archives are always linked into dependants, even if the
+    // underlying discovery path changes.
+    if enc {
+        println!("cargo:rustc-link-lib=static=SvtAv1Enc");
+    }
+    if dec {
+        println!("cargo:rustc-link-lib=static=SvtAv1Dec");
+    }
 
     // Always rerun if env hints change
     println!("cargo:rerun-if-env-changed=SVT_AV1_BUILD_FROM_SOURCE");

@@ -192,7 +192,7 @@ pub mod config {
             self
         }
         fn set_rc_mode(&mut self, mode: RcMode) -> &mut Self {
-            self.rate_control_mode = mode as u32;
+            self.rate_control_mode = mode as u8;
             self
         }
         fn set_target_bitrate(&mut self, bps: u32) -> &mut Self {
@@ -208,11 +208,11 @@ pub mod config {
             self
         }
         fn enable_roi_map(&mut self, enable: bool) -> &mut Self {
-            self.enable_roi_map = enable as u8;
+            self.enable_roi_map = enable;
             self
         }
         fn enable_recon(&mut self, enable: bool) -> &mut Self {
-            self.recon_enabled = enable as u8;
+            self.recon_enabled = enable;
             self
         }
     }
@@ -303,11 +303,7 @@ pub mod encoder {
             let mut handle = Handle::new();
             let mut cfg: Configuration = unsafe { std::mem::zeroed() };
             let code = unsafe {
-                sys::enc_bindings::svt_av1_enc_init_handle(
-                    handle.as_mut_ptr(),
-                    std::ptr::null_mut(),
-                    &mut cfg,
-                )
+                sys::enc_bindings::svt_av1_enc_init_handle(handle.as_mut_ptr(), &mut cfg)
             };
             super::ok(code)?;
             Ok((Self { handle }, cfg))

@@ -164,12 +164,6 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                         y_stride: width,
                         cr_stride: width / 2,
                         cb_stride: width / 2,
-                        width,
-                        height,
-                        org_x: 0,
-                        org_y: 0,
-                        color_fmt: sys::enc_bindings::EbColorFormat_EB_YUV420,
-                        bit_depth: sys::enc_bindings::EbBitDepth_EB_EIGHT_BIT,
                     };
 
                     let mut pic: BufferHeader = unsafe { std::mem::zeroed() };
