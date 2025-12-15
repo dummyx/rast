@@ -160,8 +160,7 @@ fn generate_bindings(enc: bool, _dec: bool, mut include_dirs: Vec<PathBuf>) {
             .layout_tests(false)
             .derive_debug(true)
             .generate_comments(true)
-            .size_t_is_usize(true)
-            ;
+            .size_t_is_usize(true);
 
         builder = builder.clang_arg("-D__STDC_CONSTANT_MACROS");
 
