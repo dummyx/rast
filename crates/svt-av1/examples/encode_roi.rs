@@ -66,15 +66,18 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     };
 
     // Attach the ROI node to an input buffer header before sending it to the encoder.
-    let mut pic: BufferHeader = unsafe { std::mem::zeroed() };
-    pic.size = std::mem::size_of::<BufferHeader>() as u32;
-    pic.pic_type = sys::enc_bindings::EbAv1PictureType_EB_AV1_INVALID_PICTURE;
-    pic.p_app_private = &mut node as *mut _ as *mut std::ffi::c_void;
+    let mut _pic: BufferHeader = unsafe { std::mem::zeroed() };
+    _pic.size = std::mem::size_of::<BufferHeader>() as u32;
+    _pic.pic_type = sys::enc_bindings::EbAv1PictureType_EB_AV1_INVALID_PICTURE;
+    _pic.p_app_private = &mut node as *mut _ as *mut std::ffi::c_void;
+
+    // In a full encode flow you would use the _pic variable:
+    // The variable is intentionally unused in this example since we only demonstrate setup
 
     // In a full encode flow you would then set parameters and send the picture:
     // enc.set_parameter(&cfg)?;
     // enc.init()?;
-    // enc.send_picture(&mut pic)?;
+    // enc.send_picture(&mut _pic)?;
     // enc.drain_packets(true, |_| {})?;
     // The SVT-AV1 library deep copies `p_app_private`, so dropping `node` after
     // send_picture is fine.

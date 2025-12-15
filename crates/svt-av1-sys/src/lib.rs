@@ -2,6 +2,7 @@
 #![allow(non_snake_case)]
 #![allow(non_upper_case_globals)]
 #![allow(clippy::all)]
+#![allow(unnecessary_transmutes)]
 
 // When the buildtime-bindgen feature is enabled (default), bindings are emitted to OUT_DIR.
 // Otherwise, the crate can be adapted to include prebuilt bindings from src/.

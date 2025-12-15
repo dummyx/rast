@@ -140,7 +140,7 @@ fn build_vendored(enc: bool, dec: bool) -> Vec<PathBuf> {
 }
 
 #[cfg(feature = "buildtime-bindgen")]
-fn generate_bindings(enc: bool, dec: bool, mut include_dirs: Vec<PathBuf>) {
+fn generate_bindings(enc: bool, _dec: bool, mut include_dirs: Vec<PathBuf>) {
     // Also search common paths
     include_dirs.extend(possible_include_dirs());
 
@@ -160,9 +160,9 @@ fn generate_bindings(enc: bool, dec: bool, mut include_dirs: Vec<PathBuf>) {
             .layout_tests(false)
             .derive_debug(true)
             .generate_comments(true)
-            .size_t_is_usize(true);
+            .size_t_is_usize(true)
+            ;
 
-        // Some platforms require defining __STDC_CONSTANT_MACROS for stdint macros
         builder = builder.clang_arg("-D__STDC_CONSTANT_MACROS");
 
         let bindings = builder
@@ -176,7 +176,7 @@ fn generate_bindings(enc: bool, dec: bool, mut include_dirs: Vec<PathBuf>) {
         println!("cargo:rerun-if-changed=wrapper_enc.h");
     }
 
-    if dec {
+    if _dec {
         let mut builder = bindgen::Builder::default()
             .header_contents(
                 "wrapper_dec.h",

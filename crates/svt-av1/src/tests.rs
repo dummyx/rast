@@ -1,11 +1,13 @@
 #[cfg(test)]
 mod tests {
+    #[cfg(feature = "encoder")]
+    use crate::config::{
+        BitDepth, ColorFormat, ConfigExt, IntraRefreshType, Profile, RcMode, Tier,
+    };
     #[cfg(feature = "decoder")]
     use crate::decoder::Decoder;
     #[cfg(feature = "encoder")]
     use crate::encoder::{BufferHeader, Configuration, Encoder};
-    #[cfg(feature = "encoder")]
-    use crate::config::{BitDepth, ColorFormat, ConfigExt, IntraRefreshType, Profile, RcMode, Tier};
     #[cfg(feature = "encoder")]
     use svt_av1_sys as sys;
 
@@ -44,10 +46,7 @@ mod tests {
         assert_eq!(cfg.tier, Tier::Main as u32);
         assert_eq!(cfg.rate_control_mode, RcMode::Vbr as u8);
         assert_eq!(cfg.qp, 42);
-        assert_eq!(
-            cfg.intra_refresh_type,
-            IntraRefreshType::FwdKey as u32
-        );
+        assert_eq!(cfg.intra_refresh_type, IntraRefreshType::FwdKey as u32);
 
         // Known-good parse succeeds.
         Encoder::parse_parameter_str(&mut cfg, "rc", "vbr").expect("parse rc=vbr");
