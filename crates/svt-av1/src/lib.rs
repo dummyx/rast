@@ -223,6 +223,21 @@ pub mod config {
 pub mod encoder {
     use super::*;
     use std::ffi::{CStr, CString};
+    use std::sync::atomic::{AtomicBool, Ordering};
+    use std::sync::{Mutex, OnceLock};
+
+    // SVT-AV1's runtime CPU detection (RTCD) setup in v4.0.1 is guarded by a
+    // non-thread-safe static `first_call_setup` boolean inside the C library.
+    //
+    // If multiple threads call `svt_av1_enc_init` concurrently for the very
+    // first encoder initialization, the library can log errors like:
+    //   `Pointer "..." is set before!`
+    //
+    // Serialize the first successful encoder init to avoid races. After that,
+    // the library's own guard is set and subsequent inits can proceed without
+    // locking.
+    static SVT_ENC_RTCD_INIT_DONE: AtomicBool = AtomicBool::new(false);
+    static SVT_ENC_RTCD_INIT_LOCK: OnceLock<Mutex<()>> = OnceLock::new();
 
     /// Raw frame/packet header exchanged with the C API.
     pub use sys::enc_bindings::EbBufferHeaderType as BufferHeader;
@@ -341,6 +356,19 @@ pub mod encoder {
 
         /// Finalizes initialization after parameters have been configured.
         pub fn init(&mut self) -> Result<()> {
+            if !SVT_ENC_RTCD_INIT_DONE.load(Ordering::Acquire) {
+                let lock = SVT_ENC_RTCD_INIT_LOCK.get_or_init(|| Mutex::new(()));
+                let _guard = lock.lock().unwrap_or_else(|e| e.into_inner());
+                if !SVT_ENC_RTCD_INIT_DONE.load(Ordering::Acquire) {
+                    let code = unsafe { sys::enc_bindings::svt_av1_enc_init(self.handle.as_ptr()) };
+                    let res = super::ok(code);
+                    if res.is_ok() {
+                        SVT_ENC_RTCD_INIT_DONE.store(true, Ordering::Release);
+                    }
+                    return res;
+                }
+            }
+
             let code = unsafe { sys::enc_bindings::svt_av1_enc_init(self.handle.as_ptr()) };
             super::ok(code)
         }

@@ -103,6 +103,43 @@ fn count_ivf_frames(data: &[u8]) -> u32 {
     frames
 }
 
+fn parse_ivf_frames(data: &[u8]) -> Vec<(u32, u64)> {
+    let mut frames = Vec::new();
+    if data.len() < 32 {
+        return frames;
+    }
+
+    let mut offset = 32usize;
+    while offset + 12 <= data.len() {
+        let size = u32::from_le_bytes([
+            data[offset],
+            data[offset + 1],
+            data[offset + 2],
+            data[offset + 3],
+        ]);
+        let ts = u64::from_le_bytes([
+            data[offset + 4],
+            data[offset + 5],
+            data[offset + 6],
+            data[offset + 7],
+            data[offset + 8],
+            data[offset + 9],
+            data[offset + 10],
+            data[offset + 11],
+        ]);
+        offset += 12;
+
+        let size_usize = size as usize;
+        if offset + size_usize > data.len() {
+            break;
+        }
+        frames.push((size, ts));
+        offset += size_usize;
+    }
+
+    frames
+}
+
 fn assert_success(out: &Output, what: &str) {
     if !out.status.success() {
         panic!(
@@ -163,6 +200,60 @@ fn e2e_cli_encode_writes_valid_ivf() {
         hdr.frame_count, frame_count,
         "IVF header frame count should match payload"
     );
+}
+
+#[test]
+fn e2e_cli_encode_multiple_frames_writes_expected_timestamps() {
+    let dir = unique_test_dir("encode-multi");
+    let yuv_path = dir.join("in.yuv");
+    let ivf_path = dir.join("out.ivf");
+
+    let width = 64u32;
+    let height = 64u32;
+    let frames_in = 3usize;
+    write_yuv420p8(&yuv_path, width, height, frames_in);
+
+    let mut cmd = Command::new("cargo");
+    cmd.current_dir(workspace_root())
+        .args([
+            "run",
+            "-q",
+            "-p",
+            "svt-av1",
+            "--example",
+            "encode",
+            "--",
+            &width.to_string(),
+            &height.to_string(),
+            yuv_path.to_str().expect("yuv path"),
+            ivf_path.to_str().expect("ivf path"),
+        ])
+        .env("SVT_AV1_BUILD_FROM_SOURCE", "1")
+        .env("SVT_AV1_NO_PKG_CONFIG", "1")
+        .env("SVT_AV1_INCLUDE_DIR", "vendor/SVT-AV1/Source/API")
+        .env_remove("SVT_AV1_LIB_DIR")
+        .env_remove("SVT_AV1_PKG_CONFIG_NAME")
+        .env("CARGO_TERM_COLOR", "never");
+    let out = cmd.output().expect("run encode example");
+    assert_success(&out, "encode example");
+
+    let data = fs::read(&ivf_path).expect("read ivf output");
+    let hdr = parse_ivf_header(&data);
+    assert_eq!(hdr.width, width as u16);
+    assert_eq!(hdr.height, height as u16);
+
+    let frames = parse_ivf_frames(&data);
+    assert_eq!(
+        frames.len(),
+        frames_in,
+        "expected one IVF packet per input frame"
+    );
+    assert_eq!(hdr.frame_count as usize, frames_in);
+    assert!(frames.iter().all(|(size, _)| *size > 0));
+
+    let mut timestamps: Vec<u64> = frames.iter().map(|(_, ts)| *ts).collect();
+    timestamps.sort_unstable();
+    assert_eq!(timestamps, vec![0, 1, 2], "unexpected packet timestamps");
 }
 
 #[test]
