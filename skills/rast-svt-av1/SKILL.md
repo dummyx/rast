@@ -1,6 +1,7 @@
 ---
 name: rast-svt-av1
-description: Workflow for developing the rast SVT-AV1 Rust bindings workspace (svt-av1-sys + svt-av1): build flags, env vars, and validation commands.
+description: >-
+  Workflow for developing the rast SVT-AV1 Rust bindings workspace (svt-av1-sys + svt-av1): build flags, env vars, and validation commands.
 ---
 
 # rast SVT-AV1 Workspace
