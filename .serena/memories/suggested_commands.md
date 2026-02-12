@@ -1,9 +1,12 @@
 # Suggested Commands
-- Build sys crate: `cargo build -p svt-av1-sys`
-- Header-only check using vendored headers (preferred deterministic path): `SVT_AV1_NO_PKG_CONFIG=1 SVT_AV1_INCLUDE_DIR=vendor/SVT-AV1/Source/API cargo check -p svt-av1-sys`
+- Build sys crate (vendored by default): `cargo build -p svt-av1-sys`
+- Vendored build + bindgen check (deterministic): `SVT_AV1_NO_PKG_CONFIG=1 SVT_AV1_INCLUDE_DIR=vendor/SVT-AV1/Source/API cargo check -p svt-av1-sys`
 - Build safe wrapper: `cargo build -p svt-av1`
-- Run encoder example with vendored headers: `SVT_AV1_NO_PKG_CONFIG=1 SVT_AV1_INCLUDE_DIR=vendor/SVT-AV1/Source/API cargo check -p svt-av1 --example encode`
-- Opt into pkg-config discovery (requires system install, for decoder too): `SVT_AV1_NO_PKG_CONFIG=0 cargo build -p svt-av1-sys` (override package name via `SVT_AV1_PKG_CONFIG_NAME`)
+- Check encoder example with vendored headers: `SVT_AV1_NO_PKG_CONFIG=1 SVT_AV1_INCLUDE_DIR=vendor/SVT-AV1/Source/API cargo check -p svt-av1 --example encode`
+- Check ROI example with vendored headers: `SVT_AV1_NO_PKG_CONFIG=1 SVT_AV1_INCLUDE_DIR=vendor/SVT-AV1/Source/API cargo check -p svt-av1 --example encode_roi`
+- Decode example (requires system decoder install via pkg-config): `SVT_AV1_NO_PKG_CONFIG=0 cargo run -p svt-av1 --features decoder --example decode -- <file.ivf>`
+- Opt into pkg-config discovery for builds: `SVT_AV1_NO_PKG_CONFIG=0 cargo build -p svt-av1-sys` (override name via `SVT_AV1_PKG_CONFIG_NAME`)
 - Tests: `cargo test -p svt-av1`
-- Lint/format: `cargo fmt --all` and `cargo clippy --workspace -D warnings`
+- E2E CLI tests (runs `encode` example; decode is opt-in): `cargo test -p svt-av1 --test e2e_cli` (enable decode with `SVT_AV1_E2E_DECODER=1 SVT_AV1_NO_PKG_CONFIG=0`)
+- Lint/format: `cargo fmt --all` and `cargo clippy --workspace -- -D warnings`
 - Root binary (demo): `cargo run -p rast`

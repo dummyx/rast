@@ -1,6 +1,20 @@
 # Project Overview
-- Purpose: Rust workspace providing SVT-AV1 bindings pinned to upstream v3.1.2; `svt-av1-sys` exposes raw bindgen-generated FFI (encoder default, decoder optional) and `svt-av1` supplies minimal RAII-safe wrappers close to the C API. Root binary `rast` currently just prints a greeting.
-- Tech stack: Rust 2024 at workspace root; crates target Rust 2021; FFI to SVT-AV1 C libs via bindgen/pkg-config; deps include `libc`, `bindgen`, `pkg-config`, `thiserror`.
-- Structure: `src/` root binary; `crates/svt-av1-sys/` sys bindings with build.rs; `crates/svt-av1/` safe wrapper; `vendor/SVT-AV1/` vendored encoder headers v3.1.2; `.github/workflows/bindgen.yml` runs bindgen vs vendored headers; sample media assets in repo root.
-- Build behavior: `svt-av1-sys` runs bindgen at build time by default (`buildtime-bindgen` feature) and links via pkg-config unless disabled. Build prefers vendored headers; pkg-config is opt-in via `SVT_AV1_NO_PKG_CONFIG=0` or setting `SVT_AV1_PKG_CONFIG_NAME`. Decoder feature requires external install with decoder headers/libs (vendored copy is encoder-only).
-- Key env vars: `SVT_AV1_INCLUDE_DIR` and `SVT_AV1_LIB_DIR` for manual header/lib paths; `SVT_AV1_NO_PKG_CONFIG` (default 1 to skip pkg-config), `SVT_AV1_PKG_CONFIG_NAME` to override package name.
+- Purpose: Rust workspace providing SVT-AV1 bindings pinned to upstream v4.0.1. `svt-av1-sys` exposes raw bindgen-generated FFI (encoder default, decoder optional). `svt-av1` provides minimal RAII wrappers and typed config helpers while staying close to the C API. Root binary `rast` is currently a placeholder (prints a greeting).
+- Structure: `src/` root binary; `crates/svt-av1-sys/` (build.rs + generated bindings in OUT_DIR); `crates/svt-av1/` (safe wrapper + examples/tests); `vendor/SVT-AV1/` (vendored upstream SVT-AV1 encoder source/headers); `.serena/` project metadata.
+- Build behavior (`svt-av1-sys/build.rs` + `svt-av1-sys/src/lib.rs`):
+  - The crate links `SvtAv1Enc` (and `SvtAv1Dec` when enabled) as static libraries.
+  - Prefer system install only when explicitly requested:
+    - `SVT_AV1_NO_PKG_CONFIG=0`: use pkg-config (optionally `SVT_AV1_PKG_CONFIG_NAME`) to discover include paths and link libs.
+    - `SVT_AV1_LIB_DIR`: link via explicit lib dir (headers from `SVT_AV1_INCLUDE_DIR` or default `vendor/SVT-AV1/Source/API`).
+  - Otherwise build the vendored SVT-AV1 encoder via CMake and link `SvtAv1Enc` statically.
+    - Vendored build forces `HAVE_VALGRIND_H=0` to avoid depending on system valgrind headers.
+  - `SVT_AV1_BUILD_FROM_SOURCE=1` forces the vendored build even if system libs are available.
+  - LTO is disabled by default for vendored builds for broader linker compatibility; set `SVT_AV1_ENABLE_LTO=1` to force-enable.
+- Decoder: vendored SVT-AV1 tree is encoder-only. Enabling the `decoder` feature requires a decoder-capable system install providing `EbSvtAv1Dec.h` and `libSvtAv1Dec.a` (via pkg-config or `SVT_AV1_{INCLUDE,LIB}_DIR`). The sys build panics if `decoder` is enabled but the header is not found.
+- Features:
+  - `svt-av1-sys`: `buildtime-bindgen` (default), `encoder` (default), `decoder` (off by default).
+  - `svt-av1`: `encoder` (default) and `decoder` passthrough.
+- Tests:
+  - Unit tests: `crates/svt-av1/src/tests.rs` (encoder by default; decoder test behind `--features decoder`).
+  - E2E CLI: `crates/svt-av1/tests/e2e_cli.rs` (always runs encode; decode is opt-in via `SVT_AV1_E2E_DECODER=1` and requires a system decoder install).
+- Key env vars: `SVT_AV1_INCLUDE_DIR`, `SVT_AV1_LIB_DIR`, `SVT_AV1_NO_PKG_CONFIG` (set to `0` to enable pkg-config), `SVT_AV1_PKG_CONFIG_NAME`, `SVT_AV1_BUILD_FROM_SOURCE`, `SVT_AV1_ENABLE_LTO`.

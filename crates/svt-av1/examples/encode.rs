@@ -201,7 +201,13 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             eprintln!("got packet: {} bytes, pts={}", size, pts);
 
             if let Some(writer) = ivf_writer.as_mut() {
-                // SAFETY: encoder returns valid buffer with length `n_filled_len`.
+                // SVT-AV1 may emit a zero-length packet; skip it to avoid
+                // constructing a slice from a null pointer.
+                if size == 0 || pkt.p_buffer.is_null() {
+                    return;
+                }
+
+                // SAFETY: encoder returns a valid buffer with length `n_filled_len`.
                 let data = unsafe { std::slice::from_raw_parts(pkt.p_buffer, size as usize) };
                 writer
                     .write_frame(data, pts as u64)

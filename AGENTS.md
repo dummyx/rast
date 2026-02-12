@@ -2,20 +2,20 @@
 
 ## Project Structure & Module Organization
 - `Cargo.toml` (workspace), `src/` (root binary `rast` - currently placeholder).
-- `crates/svt-av1-sys/`: Raw FFI (bindgen) to SVT‑AV1 v3.1.2.
+- `crates/svt-av1-sys/`: Raw FFI (bindgen) to SVT‑AV1 v4.0.1.
 - `crates/svt-av1/`: Thin safe wrappers and helpers; examples in `crates/svt-av1/examples/`.
-- `vendor/SVT-AV1/`: Vendored upstream source (v3.1.2) used for header‑only checks and building.
+- `vendor/SVT-AV1/`: Vendored upstream source (v4.0.1) used for deterministic builds and bindgen compatibility.
 
 ## Build, Test, and Development Commands
 - Build sys crate: `cargo build -p svt-av1-sys`
-- Header‑only check (no linking):
+- Vendored build + bindgen check (deterministic; builds the vendored SVT-AV1 static lib):
   `SVT_AV1_NO_PKG_CONFIG=1 SVT_AV1_INCLUDE_DIR=vendor/SVT-AV1/Source/API cargo check -p svt-av1-sys`
 - Safe wrapper: `cargo build -p svt-av1`
 - Examples:
   - Encoder: `SVT_AV1_NO_PKG_CONFIG=1 SVT_AV1_INCLUDE_DIR=vendor/SVT-AV1/Source/API cargo check -p svt-av1 --example encode`
   - ROI encoding: `SVT_AV1_NO_PKG_CONFIG=1 SVT_AV1_INCLUDE_DIR=vendor/SVT-AV1/Source/API cargo check -p svt-av1 --example encode_roi`
-  - Decoder: `cargo check -p svt-av1 --example decode` (requires system install)
-- When system SVT‑AV1 headers/libs are present, they must be API‑compatible with v3.1.2; if not, prefer the vendored commands above to avoid bindgen/type mismatches. Decoder requires a system install with `EbSvtAv1Dec.h`/`libSvtAv1Dec` (vendored copy is encoder-only); pkg-config is opt-in via `SVT_AV1_NO_PKG_CONFIG=0`.
+  - Decoder: `SVT_AV1_NO_PKG_CONFIG=0 cargo check -p svt-av1 --features decoder --example decode` (requires system install)
+- When system SVT‑AV1 headers/libs are present, they must be API‑compatible with v4.0.1; if not, prefer the vendored commands above to avoid bindgen/type mismatches. Decoder requires a system install with `EbSvtAv1Dec.h`/`libSvtAv1Dec.a` (vendored copy is encoder-only); pkg-config is opt-in via `SVT_AV1_NO_PKG_CONFIG=0`.
 - Format & lint: `cargo fmt --all`, `cargo clippy --workspace -- -D warnings`
 
 ### Build Process Notes
@@ -32,8 +32,10 @@
 ## Testing Guidelines
 - Use Rust tests: `cargo test -p svt-av1`.
 - Place unit tests inline with modules (`mod tests {}`); current tests are in `src/tests.rs`.
+- End-to-end (CLI) tests live in `crates/svt-av1/tests/e2e_cli.rs` and exercise the `encode`/`decode` examples as subprocesses.
+- Decoder E2E is opt-in (requires a decoder-capable system install): `SVT_AV1_E2E_DECODER=1 SVT_AV1_NO_PKG_CONFIG=0 cargo test -p svt-av1 --test e2e_cli`
 - Prefer small, deterministic tests; avoid requiring system SVT‑AV1 unless the test is feature‑gated.
-- Test with specific features: `cargo test -p svt-av1 --features encoder,decoder` (when decoder headers available)
+- Test decoder paths (requires a decoder-capable system install): `SVT_AV1_NO_PKG_CONFIG=0 cargo test -p svt-av1 --features decoder`
 
 ## Commit & Pull Request Guidelines
 - Keep commits focused; prefer Conventional Commit style (`feat:`, `fix:`, `docs:`) when possible.
@@ -42,7 +44,7 @@
 
 ## Security & Configuration Tips
 - Linking: set `SVT_AV1_INCLUDE_DIR` and `SVT_AV1_LIB_DIR` or install via `pkg-config`.
-- Do not commit generated bindings or secrets. Vendored headers are pinned to v3.1.2.
+- Do not commit generated bindings or secrets. Vendored headers are pinned to v4.0.1.
 
 ### Environment Variables
 - `SVT_AV1_INCLUDE_DIR`: directory containing headers.
@@ -56,3 +58,5 @@
 - Prefer minimal diffs; keep code style consistent. Use `rg` for search and read files in ≤250‑line chunks.
 - Obey this AGENTS.md for all edits within the repo; update it if your changes alter the workflow.
 - Build warnings from bindgen-generated code are suppressed with `#![allow(unnecessary_transmutes)]` in `svt-av1-sys/src/lib.rs`.
+- If no integrated LSP is available, use Serena's LSP-backed tools for navigation and edits (symbols/refs/renames) instead of manual full-file reads.
+- If up-to-date third-party/library documentation is needed, use Context7 (resolve library id, then query docs) instead of relying on memory.

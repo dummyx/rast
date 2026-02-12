@@ -16,7 +16,7 @@ default = ["buildtime-bindgen", "encoder"]
 
 # Feature flags to include Encoder and/or Decoder APIs.
 encoder = []
-# Decoder headers are not present in SVT-AV1 v3.1.2; keep the feature off by default.
+# Decoder headers are not present in the vendored SVT-AV1 tree; keep the feature off by default.
 decoder = []
 
 [dependencies]

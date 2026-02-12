@@ -108,20 +108,35 @@ fn build_vendored(enc: bool, dec: bool) -> Vec<PathBuf> {
         );
     }
 
-    let dst = cmake::Config::new(&vendor_dir)
-        .profile("Release")
+    let mut cfg = cmake::Config::new(&vendor_dir);
+    cfg.profile("Release")
         .define("BUILD_SHARED_LIBS", "OFF")
         .define("BUILD_APPS", "OFF")
         .define("BUILD_TESTING", "OFF")
+        // v4.0.1's CMake tries to auto-detect valgrind headers and will
+        // enable a code path that includes <valgrind/valgrind.h>. Many build
+        // environments (including CI) don't have the dev headers installed;
+        // force the feature off for a more hermetic vendored build.
+        .define("HAVE_VALGRIND_H", "0")
+        // Upstream defaults to enabling LTO on newer GCC/Clang toolchains.
+        // We disable IPO/LTO by default (see comments below) to keep the
+        // vendored static library linkable by common Rust linkers.
+        .define("SVT_AV1_LTO", if enable_lto { "ON" } else { "OFF" })
+        // Older SVT-AV1 releases used ENABLE_LTO; keep it for backwards
+        // compatibility (harmless on versions that ignore it).
+        .define("ENABLE_LTO", if enable_lto { "ON" } else { "OFF" })
+        .define("CMAKE_POSITION_INDEPENDENT_CODE", "ON");
+
+    if !enable_lto {
         // rust-lld cannot consume GCC LTO objects; explicitly disable any
         // interprocedural optimization even if the upstream default toggles it.
-        .define("CMAKE_INTERPROCEDURAL_OPTIMIZATION", "OFF")
-        .define("ENABLE_LTO", if enable_lto { "ON" } else { "OFF" })
-        .define("CMAKE_POSITION_INDEPENDENT_CODE", "ON")
-        .cflag("-fno-lto")
-        .cxxflag("-fno-lto")
-        .asmflag("-fno-lto")
-        .build();
+        cfg.define("CMAKE_INTERPROCEDURAL_OPTIMIZATION", "OFF")
+            .cflag("-fno-lto")
+            .cxxflag("-fno-lto")
+            .asmflag("-fno-lto");
+    }
+
+    let dst = cfg.build();
 
     let mut lib_dir = dst.join("lib");
     if !lib_dir.exists() {
