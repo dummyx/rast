@@ -1,6 +1,6 @@
 use svt_av1::config::{BitDepth, ColorFormat, ConfigExt, IntraRefreshType, Profile, RcMode, Tier};
 use svt_av1::encoder::{
-    BufferHeader, Configuration, Encoder, PrivDataNode, RoiMap, RoiMapEvent, ROI_MAP_EVENT,
+    BufferHeader, Configuration, Encoder, PrivDataNode, RoiMapEvent, ROI_MAP_EVENT,
 };
 use svt_av1_sys as sys;
 
@@ -50,18 +50,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         next: std::ptr::null_mut(),
     };
 
-    let mut roi = RoiMap {
-        evt_num: 1,
-        evt_list: &mut roi_evt,
-        cur_evt: &mut roi_evt,
-        qp_map: std::ptr::null_mut(),
-        buf: std::ptr::null_mut(),
-    };
-
     let mut node = PrivDataNode {
         node_type: ROI_MAP_EVENT,
-        data: &mut roi as *mut _ as *mut std::ffi::c_void,
-        size: std::mem::size_of::<RoiMap>() as u32,
+        data: &mut roi_evt as *mut _ as *mut std::ffi::c_void,
+        size: std::mem::size_of::<*mut RoiMapEvent>() as u32,
         next: std::ptr::null_mut(),
     };
 
@@ -79,8 +71,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     // enc.init()?;
     // enc.send_picture(&mut _pic)?;
     // enc.drain_packets(true, |_| {})?;
-    // The SVT-AV1 library deep copies `p_app_private`, so dropping `node` after
-    // send_picture is fine.
+    // ROI map events are shallow-copied by SVT-AV1, so the segment map and the
+    // event payload must stay alive until the encoder has consumed dependent
+    // frames.
 
     println!("ROI example: configuration and ROI structures constructed.");
 
